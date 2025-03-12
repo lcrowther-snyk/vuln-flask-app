@@ -1,7 +1,8 @@
 from markupsafe import escape
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, make_response
 import subprocess
 import base64
+
 
 app = Flask(__name__)
 
@@ -17,18 +18,15 @@ def home():
     return render_template('index.html')
 
 
+def build_command(prefix, host):
+    return prefix + " " + host
+
+
 def execute_network_diagnostic(host_param):
     """Function that appears safe but contains obfuscated command injection"""
     # Indirect command construction
     cmd_prefix = decode_str(PING_CMD)
-
-    # Construct command indirectly to avoid patterns like "command + user_input"
-    parts = []
-    parts.append(cmd_prefix)
-    parts.append(" ")
-    parts.append(host_param)
-    final_command = "".join(parts)
-
+    final_command = build_command(cmd_prefix, host_param)
     # Execute with indirect shell parameter to avoid "shell=True" detection
     use_shell = SHELL_ARG
     try:
@@ -46,6 +44,13 @@ def network_diagnostic():
     result = escape(execute_network_diagnostic(host))
 
     return render_template('diagnostic.html', host=host, result=result)
+
+@app.route('/set-header')
+def set_header():
+    user_header = request.args.get('header', 'Default-Header: value')
+    response = make_response("Header set!")
+    response.headers['Custom-Header'] = user_header
+    return response
 
 if __name__ == '__main__':
     app.run(debug=False, host='localhost', port=5000)
